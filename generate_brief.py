@@ -6,11 +6,12 @@ from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-DATE_ISO = "2026-04-23"
-BIAS = "WAIT"
-ENTRY_PERMISSION = "CAUTION"
+DATE_ISO = "2026-05-14"
+BIAS = "RANGE"
+ENTRY_PERMISSION = "YELLOW"
+GEN_TIME = "08:55 IST"
 
-OUT_PATH = f"trading-briefs/2026/04-April/Trading_Brief_{DATE_ISO}_{BIAS}.docx"
+OUT_PATH = f"trading-briefs/2026/05-May/Trading_Brief_{DATE_ISO}_{BIAS}.docx"
 
 
 def shade_cell(cell, hex_fill):
@@ -48,301 +49,523 @@ def add_bullets(doc, items):
         doc.add_paragraph(item, style="List Bullet")
 
 
-def add_kv_table(doc, rows, header=None, shade_header=True):
-    ncols = len(rows[0])
-    table = doc.add_table(rows=(1 if header else 0) + len(rows), cols=ncols)
+def add_kv_table(doc, rows, col_widths=(1.6, 2.0, 2.4)):
+    table = doc.add_table(rows=1, cols=3)
     table.style = "Light Grid Accent 1"
-    r_idx = 0
-    if header:
-        hdr = table.rows[0]
-        for i, txt in enumerate(header):
-            cell = hdr.cells[i]
-            cell.text = ""
-            p = cell.paragraphs[0]
-            run = p.add_run(txt)
-            run.bold = True
-            run.font.size = Pt(11)
-            if shade_header:
-                shade_cell(cell, "1F3864")
-                run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-        r_idx = 1
-    for i, row in enumerate(rows):
-        trow = table.rows[r_idx + i]
-        for j, val in enumerate(row):
-            cell = trow.cells[j]
-            cell.text = ""
-            p = cell.paragraphs[0]
-            run = p.add_run(str(val))
-            run.font.size = Pt(11)
-            if j == 0:
-                run.bold = True
+    hdr = table.rows[0].cells
+    hdr[0].text = "Metric"
+    hdr[1].text = "Value"
+    hdr[2].text = "Signal"
+    for c in hdr:
+        for p in c.paragraphs:
+            for r in p.runs:
+                r.bold = True
+        shade_cell(c, "1F4E78")
+        for p in c.paragraphs:
+            for r in p.runs:
+                r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+    for metric, value, signal in rows:
+        row = table.add_row().cells
+        row[0].text = metric
+        row[1].text = value
+        row[2].text = signal
+    for i, w in enumerate(col_widths):
+        for cell in table.columns[i].cells:
+            cell.width = Inches(w)
     return table
 
 
-def badge_line(doc, label, value, fill_hex, text_color=RGBColor(0xFF, 0xFF, 0xFF)):
-    table = doc.add_table(rows=1, cols=1)
-    table.autofit = True
-    cell = table.rows[0].cells[0]
-    cell.text = ""
-    shade_cell(cell, fill_hex)
-    p = cell.paragraphs[0]
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p.add_run(f"{label}: {value}")
-    run.bold = True
-    run.font.size = Pt(13)
-    run.font.color.rgb = text_color
+def add_setup_block(doc, stock):
+    add_para(
+        doc,
+        "══════════════════════════════════════",
+        bold=True,
+        color=RGBColor(0x1F, 0x4E, 0x78),
+    )
+    add_para(
+        doc,
+        f"{stock['name']} — NSE: {stock['ticker']} | {stock['side']} | Grade {stock['grade']}",
+        bold=True,
+        size=13,
+        color=RGBColor(0xC0, 0x00, 0x00) if stock['side'] == "PUT" else RGBColor(0x00, 0x70, 0x30),
+    )
+    add_para(
+        doc,
+        f"CMP: ₹{stock['cmp']} | Lot: {stock['lot']} | Crude aligned: {stock['crude_aligned']}",
+        bold=True,
+    )
+
+    add_para(doc, f"CATALYST: {stock['catalyst']}")
+
+    add_para(doc, "TECHNICAL:", bold=True)
+    add_bullets(
+        doc,
+        [
+            f"Daily trend: {stock['daily_trend']}",
+            f"Above 200 DMA: {stock['above_200dma']}",
+            f"Weekly trend: {stock['weekly_trend']}",
+            f"Support ₹{stock['support']} | Resistance ₹{stock['resistance']}",
+        ],
+    )
+
+    add_para(doc, "STRUCTURAL:", bold=True)
+    add_bullets(
+        doc,
+        [
+            f"OI direction: {stock['oi_direction']}",
+            f"Delivery %: {stock['delivery']}",
+            f"Block deal: {stock['block_deal']} | Ban list: {stock['ban_list']}",
+        ],
+    )
+
+    add_para(doc, "OPTION SETUP:", bold=True)
+    add_bullets(
+        doc,
+        [
+            f"Strike: ₹{stock['strike']} [{stock['moneyness']}] | Expiry: {stock['expiry']}",
+            f"THETA WARNING if expiry <= 3 days: {stock['theta_warn']}",
+        ],
+    )
+
+    add_para(doc, "ENTRY (ALL 4 must fire):", bold=True)
+    add_bullets(
+        doc,
+        [
+            f"ST {stock['st']} on 15-min confirmed",
+            f"RSI {stock['rsi_cond']} 50 on 15-min",
+            f"StochRSI cross {stock['stoch']} from extreme",
+            "Volume > 1.5x 20-period avg",
+            f"Confirmation candle: 15-min close {stock['cand_dir']} ₹{stock['cand_level']}",
+        ],
+    )
+
+    add_para(
+        doc,
+        f"T1 (book 40%): ₹{stock['t1']} | T2 (book 40%): ₹{stock['t2']}",
+        bold=True,
+    )
+    add_para(doc, f"SL: ₹{stock['sl']} + {stock['sl_cond']}", bold=True)
+    add_para(doc, f"R:R: {stock['rr']}", bold=True)
+    add_para(doc, "Time stop: Exit by 13:00 IST", italic=True)
+    add_para(doc, f"GRADE REASON: {stock['grade_reason']}", italic=True)
+    add_para(doc, "")
 
 
-# ============== BUILD DOCUMENT ==============
-doc = Document()
+def main():
+    doc = Document()
 
-# Tighten page margins
-for section in doc.sections:
-    section.top_margin = Cm(1.8)
-    section.bottom_margin = Cm(1.8)
-    section.left_margin = Cm(1.8)
-    section.right_margin = Cm(1.8)
+    title = doc.add_heading(
+        f"ELITE DAILY TRADING BRIEF — {DATE_ISO} — {BIAS}", level=0
+    )
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-# ---------- HEADER ----------
-title = doc.add_paragraph()
-title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = title.add_run("ELITE DAILY TRADING INTELLIGENCE BRIEF")
-run.bold = True
-run.font.size = Pt(20)
-run.font.color.rgb = RGBColor(0x1F, 0x38, 0x64)
+    add_para(
+        doc,
+        f"Generated: {GEN_TIME} | Weekly expiry: 5 days (Tue 19-May) | "
+        f"Monthly expiry: 12 days (Tue 26-May index / Thu 28-May stocks) | Expiry week: NO",
+        italic=True,
+        align=WD_ALIGN_PARAGRAPH.CENTER,
+    )
 
-sub = doc.add_paragraph()
-sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-sub_run = sub.add_run("Indian F&O Day Trader — Nifty + Stocks")
-sub_run.italic = True
-sub_run.font.size = Pt(12)
+    cbox = doc.add_table(rows=5, cols=1)
+    cbox.style = "Light List Accent 5"
+    cbox.rows[0].cells[0].text = "BIAS: RANGE (cautious-bull lean)"
+    cbox.rows[1].cells[0].text = "ENTRY PERMISSION: YELLOW"
+    cbox.rows[2].cells[0].text = "CRUDE MODE: CAUTION (Rs 8,500-9,000) | Direction: ELEVATED / sideways-up"
+    cbox.rows[3].cells[0].text = "VIX SIZING: HALF SIZE (India VIX 19.42, mandatory 15-20 band)"
+    cbox.rows[4].cells[0].text = "EXPIRY ALERT: NO (next NSE weekly Tue 19-May)"
+    for r in cbox.rows:
+        for c in r.cells:
+            for p in c.paragraphs:
+                for run in p.runs:
+                    run.bold = True
+            shade_cell(c, "FFF2CC")
 
-date_p = doc.add_paragraph()
-date_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-dr = date_p.add_run(f"Date: Thursday, 23 April 2026  |  Generated 08:45 IST")
-dr.bold = True
-dr.font.size = Pt(11)
+    add_heading(doc, "SECTION 1 — MACRO SNAPSHOT", level=1)
 
-# Bias + permission badges
-badge_line(doc, "TODAY'S BIAS", BIAS, "F1C232")           # amber for WAIT
-badge_line(doc, "ENTRY PERMISSION", ENTRY_PERMISSION, "E69138")  # orange for CAUTION
-badge_line(doc, "CRUDE RULE MODE", "MILD BULL (caution tilt)", "6AA84F")
+    rows = [
+        ("MCX Crude (proxy)", "~ Rs 8,740 / bbl", "CAUTION — half size"),
+        ("Brent / WTI", "$107.0 / $102.21", "ELEVATED (Hormuz war premium)"),
+        ("GIFT Nifty gap", "+171 pts (23,584 vs 23,412.60)", "Gap-up — bullish open"),
+        ("S&P 500 (12-May close)", "7,444.25 (+0.58%)", "Risk-on; record close"),
+        ("Nasdaq (12-May close)", "26,402.34 (+1.20%)", "Tech-led record"),
+        ("Dow (13-May)", "Slipped on hot PPI", "Mixed risk-off undertone"),
+        ("US VIX", "DATA_UNAVAILABLE", "Recent calm but PPI shock"),
+        ("India VIX", "19.42 (+0.75%)", "HALF-SIZE mandatory (15-20)"),
+        ("Nifty close (13-May)", "23,412.60 (+33.05, +0.14%)", "Recovered intraday low"),
+        ("FII cash (13-May)", "-Rs 4,520.91 Cr", "SELL (5th day of net sell)"),
+        ("DII cash (13-May)", "+Rs 5,523.51 Cr", "BUY — absorbing FII supply"),
+        ("USD-INR (est.)", "~ Rs 85.5 (war-driven weakness)", "Weak rupee — IT mixed"),
+        ("INFY ADR", "$11.69 vs prev $12.05 = -2.99%", "INFY likely opens DOWN"),
+        ("WIT ADR", "$1.84 (-1.87%)", "Wipro opens DOWN"),
+        ("IBN ADR", "$25.75 (-0.10%)", "ICICI Bank flat"),
+        ("HDB ADR", "~ $23.79 (recent -3.3%)", "HDFC Bank flat-to-down"),
+    ]
+    add_kv_table(doc, rows)
 
-doc.add_paragraph()
+    add_para(doc, "")
+    add_para(
+        doc,
+        "Geopolitical one-liner: Strait of Hormuz near-shut since 28-Feb US/Israel-Iran war; "
+        "Pakistan-mediated talks ongoing; ~14.5 mb/d supply gap; ~2,000 vessels stranded.",
+        italic=True,
+    )
+    add_para(
+        doc,
+        "Today's intraday headline risk: HIGH (any Iran/talks headline = whippy crude & defensives).",
+        bold=True,
+        color=RGBColor(0xC0, 0x00, 0x00),
+    )
 
-# ---------- SECTION 1 — MACRO SNAPSHOT ----------
-add_heading(doc, "Section 1 — Macro Snapshot", level=1, color=RGBColor(0x1F, 0x38, 0x64))
+    add_heading(doc, "SECTION 2 — CRUDE RULE + STRUCTURAL READ", level=1)
 
-add_kv_table(doc,
-    header=["Metric", "Reading", "Interpretation"],
-    rows=[
-        ["MCX Crude (₹/bbl)", "~8,390", "Mild Bull zone (7,500–8,500); fragile"],
-        ["Brent / WTI", "$98.20 / $89.22", "Off highs after Iran ceasefire extended"],
-        ["India VIX", "17.53 (-6.71%)", "Elevated but cooling — half-size trades"],
-        ["US VIX (CBOE)", "18.92 (-2.97%)", "Calm-side of fear; calmest since March"],
-        ["S&P 500", "7,137.90 (+1.05%)", "Record high — TAILWIND"],
-        ["Nasdaq", "24,657.57 (+1.64%)", "Record high — TAILWIND"],
-        ["Dow Jones", "49,490.03 (+0.69%)", "Strong close"],
-        ["Fear & Greed (US)", "70 — Greed", "Near Extreme Greed threshold"],
-        ["Nikkei 225", "59,585.86 (+0.4%)", "Record high — bullish Asia"],
-        ["Hang Seng", "26,163.24 (-1.22%)", "Weak — drag on Asia sentiment"],
-        ["Gift Nifty", "24,304.5 (-59.5)", "Flat-to-slight gap DOWN vs 24,378 close"],
-        ["DXY", "98.57 (+0.18%)", "Below 104 — moderate rupee pressure"],
-        ["USD/INR", "93.80", "Rupee weak (-9.71% YoY) — FII caution"],
-    ])
+    add_para(doc, "CRUDE_MODE: CAUTION (band Rs 8,500-9,000) — half size mandatory", bold=True)
+    add_para(doc, "CRUDE_DIRECTION: ELEVATED; sideways-up bias; war premium intact", bold=True)
+    add_para(
+        doc,
+        "CRUDE_FLIP_LEVEL: Rs 9,000 -> STRONG BEAR (puts only). "
+        "Downside flip Rs 7,500 -> MILD BULL (would need Hormuz reopening headline).",
+        bold=True,
+    )
+    add_para(doc, "AVOID: BPCL, IOC, paints (APNT/BRGR), aviation (INDIGO), tyres (APOLLOTYRE/MRF), fertilisers (CHAMBLFERT)", bold=True)
+    add_para(doc, "EXCEPTION_CALLS: ONGC, OIL INDIA, MRPL (upstream oil); defence (BEL, HAL) is war-narrative ally", bold=True)
 
-# ---------- SECTION 2 — CRUDE RULE APPLIED ----------
-doc.add_paragraph()
-add_heading(doc, "Section 2 — Crude Rule Applied", level=1, color=RGBColor(0x1F, 0x38, 0x64))
+    add_para(doc, "")
+    add_para(doc, "Structural read (Nifty internals):", bold=True)
+    add_bullets(
+        doc,
+        [
+            "Nifty 23,412.60 vs estimated Max Pain ~23,400-23,500 -> magnet near current spot (range bias).",
+            "Highest OI Call resistance (est.): 23,500 / 23,600 — ceiling for the day.",
+            "Highest OI Put support (est.): 23,300 / 23,200 — floor.",
+            "PCR: DATA_UNAVAILABLE specifically; inferred 0.85-0.95 from FII sell + heavy DII buy + flat close.",
+            "Futures basis: usually slight premium when DIIs buying; flag at open if discount appears = warning.",
+            "OI change reading: Tuesday's weekly expired calm; fresh OI build expected at 23,500CE / 23,300PE on open.",
+        ],
+    )
+    add_para(
+        doc,
+        "Bank Nifty leadership check: Banking ADRs (IBN flat, HDB slightly weak) -> "
+        "Bank Nifty likely LAGGING. Any Nifty rally not confirmed by Bank Nifty is SUSPECT — fade.",
+        bold=True,
+    )
 
-add_para(doc, "MODE: MILD BULL — with a CAUTION tilt.", bold=True, size=12)
-add_bullets(doc, [
-    "MCX crude sits at ~₹8,390, inside the ₹7,500–₹8,500 band that normally permits full-size calls.",
-    "BUT crude hit ₹10,888 earlier this month during the Iran war spike; the band is statistically fragile.",
-    "Trump extended the US-Iran ceasefire indefinitely on 22 Apr. Brent fell below $98, WTI below $89.",
-    "Strait of Hormuz remains partially halted; a gunboat attack on a Liberia-flagged vessel earlier in week.",
-    "Vitol CEO pegs total war-driven supply loss at 600–700 million barrels so far (potentially 1 billion).",
-    "Critical level: ₹8,500 MCX. Break above = downgrade to half-size. Break of ₹9,000 = flip to puts-only.",
-    "Tail-risk: any single Iran-related headline can re-spike crude 5–7% intraday.",
-])
+    add_heading(doc, "SECTION 3 — CONTRARIAN CHECK (Layer 3)", level=1)
+    add_para(
+        doc,
+        "Q1. CONSENSUS: Retail and TV analysts will say 'gap-up follow-through to 23,600, "
+        "buy on dips, defence-and-PSU rally'. Most will chase opening 15-min strength in BEL / "
+        "Adani names and shun IT.",
+        bold=True,
+    )
+    add_para(
+        doc,
+        "Q2. THE TRAP: Gap-ups against a 5-day FII sell streak and elevated VIX historically reverse "
+        "within the first 90 minutes. If Bank Nifty fails to confirm and crude ticks up on any Hormuz "
+        "headline, the gap fills and 23,300 PE writers get squeezed — but heavy DII bid prevents a true "
+        "break. Net: chop both ways, theta-rich pin to max pain. Option sellers profit; option buyers bleed.",
+        bold=True,
+    )
+    add_para(
+        doc,
+        "Q3. RETAIL STOPS: Long stops clustered below 23,350 (gap-fill) and 23,300 (Put support). "
+        "Short stops above 23,550-23,600 (Call wall). Both sides will get tagged before any directional move.",
+        bold=True,
+    )
+    add_para(
+        doc,
+        "Q4. FLIP TRIGGER: A single Reuters/CNBC flash on (i) Hormuz reopening = explosive UP day, "
+        "fade all OMC puts, chase IT calls; or (ii) Iran retaliation = crude +5% = SHARP DOWN, IT and "
+        "OMCs collapse together. Watch the wires till 12:30 PM.",
+        bold=True,
+    )
 
-add_para(doc, "Crude-aligned sector bias:", bold=True, size=11)
-add_bullets(doc, [
-    "Bullish: ONGC, Oil India (upstream — $1/bbl adds ~₹6,180 cr to ONGC earnings annually)",
-    "Bearish: BPCL, HPCL, IOC (OMCs squeezed), IndiGo & aviation (+$10 Brent = +₹3,500–4,000 cr fuel bill)",
-])
+    add_para(doc, "")
+    add_heading(doc, "Contrarian Override Logic Applied", level=2)
+    add_bullets(
+        doc,
+        [
+            "A: GIFT Nifty gap-up > +100 pts? YES (+171).",
+            "B: Crude falling > 2% overnight? NO (crude flat-to-elevated).",
+            "C: Contrarian scenario probability > 40%? YES (gap-fill scenario plausible).",
+            "D: Expiry week + PCR < 0.8? NO (5 days to weekly, not expiry week).",
+        ],
+    )
+    add_para(
+        doc,
+        "Result: A YES + B NO -> NO full override. C YES alone keeps confidence at MEDIUM, "
+        "not HIGH. Final bias = RANGE with mild bull lean; permission YELLOW.",
+        bold=True,
+        color=RGBColor(0xC0, 0x55, 0x00),
+    )
 
-# ---------- SECTION 3 — INDIAN MARKET INTERNALS ----------
-doc.add_paragraph()
-add_heading(doc, "Section 3 — Indian Market Internals", level=1, color=RGBColor(0x1F, 0x38, 0x64))
+    add_heading(doc, "SECTION 4 — 5 INDIVIDUAL F&O SETUPS", level=1)
 
-add_para(doc, "Nifty Technical Levels", bold=True, size=12)
-add_kv_table(doc,
-    header=["Level", "Value", "Meaning"],
-    rows=[
-        ["Previous Close", "24,378", "Closed -199 pts (-0.81%); broke 24,400"],
-        ["Expected Open", "~24,320–24,340", "Mild gap down per Gift Nifty"],
-        ["Support S1", "24,322", "Intraday low zone from 22 Apr"],
-        ["Support S2", "24,000", "Psychological; breach = 23,800 target"],
-        ["Resistance R1", "24,450–24,500", "Strong cap for three sessions"],
-        ["Resistance R2", "24,600", "Bullish reclaim level"],
-        ["200 DMA", "23,527", "Well above — long-term trend BULLISH"],
-        ["50 DMA", "~24,446", "Testing from below — bearish short-term"],
-    ])
+    setups = [
+        {
+            "name": "ONGC",
+            "ticker": "ONGC",
+            "side": "CALL",
+            "grade": "A+",
+            "cmp": "297.15",
+            "lot": "2,250",
+            "crude_aligned": "YES (upstream beneficiary)",
+            "catalyst": "Brent $107 / WTI $102 — realisation tailwind; 71% of India's crude output; "
+                        "near 52-wk high Rs 307.50; royalty cut to 8% boosts margin.",
+            "daily_trend": "UP",
+            "above_200dma": "YES",
+            "weekly_trend": "UP (+20.69% YoY, +18.06% 6m)",
+            "support": "290 / 285",
+            "resistance": "307.50 (52-wk high) / 315",
+            "oi_direction": "LONG BUILD (price up + OI up trend last 3 sessions)",
+            "delivery": "RISING",
+            "block_deal": "NO",
+            "ban_list": "NO",
+            "strike": "300",
+            "moneyness": "ATM",
+            "expiry": "28-May-2026 (monthly)",
+            "theta_warn": "NO (14 days to expiry)",
+            "st": "GREEN",
+            "rsi_cond": "ABOVE",
+            "stoch": "UP",
+            "cand_dir": "ABOVE",
+            "cand_level": "299.50",
+            "t1": "305.00",
+            "t2": "310.00",
+            "sl": "294.50",
+            "sl_cond": "ST flip to RED on 15m",
+            "rr": "2.4:1",
+            "grade_reason": "Best directional alignment — crude tailwind + chart breakout zone + ADR sector clue.",
+        },
+        {
+            "name": "Bharat Electronics",
+            "ticker": "BEL",
+            "side": "CALL",
+            "grade": "A",
+            "cmp": "428.10",
+            "lot": "2,850",
+            "crude_aligned": "Neutral (war-narrative beneficiary)",
+            "catalyst": "Fresh Rs 1,251 Cr GBMES + Rs 569 Cr avionics orders; order book Rs 73,015 Cr; "
+                        "war premium intact while Hormuz unresolved.",
+            "daily_trend": "UP",
+            "above_200dma": "YES",
+            "weekly_trend": "UP (+10% YTD, +41% YoY)",
+            "support": "418 / 410",
+            "resistance": "445 / 473.45 (52-wk high)",
+            "oi_direction": "LONG BUILD continuing",
+            "delivery": "STABLE",
+            "block_deal": "NO",
+            "ban_list": "NO",
+            "strike": "430",
+            "moneyness": "ATM/slight-OTM",
+            "expiry": "28-May-2026 (monthly)",
+            "theta_warn": "NO",
+            "st": "GREEN",
+            "rsi_cond": "ABOVE",
+            "stoch": "UP",
+            "cand_dir": "ABOVE",
+            "cand_level": "431.50",
+            "t1": "438.00",
+            "t2": "445.00",
+            "sl": "423.50",
+            "sl_cond": "15m close below 425 & ST RED",
+            "rr": "2.2:1",
+            "grade_reason": "Cleanest war-narrative momentum stock; valuation high (PE 51) so size half.",
+        },
+        {
+            "name": "Infosys",
+            "ticker": "INFY",
+            "side": "PUT",
+            "grade": "A",
+            "cmp": "1,129.50",
+            "lot": "400",
+            "crude_aligned": "Aligned (weak rupee from crude is complex; discretionary IT spend collapsing globally)",
+            "catalyst": "ADR INFY at $11.69 vs $12.05 = -2.99% gap-down; stock near 52-wk low Rs 1,123; "
+                        "RSI 38.82 already weak; in yesterday's losers; client IT budget cuts amid US PPI shock.",
+            "daily_trend": "DOWN",
+            "above_200dma": "NO (well below)",
+            "weekly_trend": "DOWN",
+            "support": "1,123 (52-wk low) / 1,100",
+            "resistance": "1,140 / 1,160",
+            "oi_direction": "SHORT BUILD (price down + OI up)",
+            "delivery": "STABLE",
+            "block_deal": "NO",
+            "ban_list": "NO",
+            "strike": "1,120",
+            "moneyness": "ATM after gap",
+            "expiry": "28-May-2026 (monthly)",
+            "theta_warn": "NO",
+            "st": "RED",
+            "rsi_cond": "BELOW",
+            "stoch": "DOWN",
+            "cand_dir": "BELOW",
+            "cand_level": "1,120.00",
+            "t1": "1,108.00",
+            "t2": "1,098.00",
+            "sl": "1,134.00",
+            "sl_cond": "15m close above 1,134 & ST GREEN",
+            "rr": "2.0:1",
+            "grade_reason": "ADR-pre-confirmed direction; risk = 52-wk low magnet bounce, hence tight SL.",
+        },
+        {
+            "name": "Asian Paints",
+            "ticker": "ASIANPAINT",
+            "side": "PUT",
+            "grade": "A-",
+            "cmp": "2,583.00",
+            "lot": "200",
+            "crude_aligned": "YES (crude-derivative inputs = 55% of RM)",
+            "catalyst": "Yesterday's +3.17% spike into resistance 2,560-2,565; 2nd price hike effective "
+                        "5-May = margin admission, not strength; paint stocks tumbled 5% on prior crude rally; "
+                        "valuation concerns flagged.",
+            "daily_trend": "Choppy UP into resistance",
+            "above_200dma": "YES (above 5/20/50/100/200 DMA)",
+            "weekly_trend": "Sideways-up; faded prior peaks",
+            "support": "2,460 / 2,380 / 2,300",
+            "resistance": "2,600 (psychological + heavy call OI 6,910 contracts)",
+            "oi_direction": "Call writing at 2,600 (resistance defended)",
+            "delivery": "STABLE",
+            "block_deal": "NO",
+            "ban_list": "NO",
+            "strike": "2,560",
+            "moneyness": "Slight-ITM after open",
+            "expiry": "28-May-2026 (monthly)",
+            "theta_warn": "NO",
+            "st": "RED",
+            "rsi_cond": "BELOW",
+            "stoch": "DOWN (from >70)",
+            "cand_dir": "BELOW",
+            "cand_level": "2,570.00",
+            "t1": "2,530.00",
+            "t2": "2,495.00",
+            "sl": "2,605.00",
+            "sl_cond": "15m close above 2,605 (call wall break)",
+            "rr": "2.1:1",
+            "grade_reason": "Classic fade-the-spike into call wall with crude margin headwind; lot of 200 = half-size friendly.",
+        },
+        {
+            "name": "HPCL",
+            "ticker": "HINDPETRO",
+            "side": "PUT",
+            "grade": "B+",
+            "cmp": "377.55",
+            "lot": "2,700",
+            "crude_aligned": "YES (OMC = crude victim, downstream)",
+            "catalyst": "Yesterday's +3% post-Q4 beat = sell-the-news candidate; YTD -24% vs Nifty -10% "
+                        "shows structural weakness; GRM $14.27 looks peak quarter, mean-reverts as crude stays "
+                        "high. Dividend already priced.",
+            "daily_trend": "Bounce within downtrend",
+            "above_200dma": "NO",
+            "weekly_trend": "DOWN (-22.14% 6m)",
+            "support": "365 / 358",
+            "resistance": "385 / 395",
+            "oi_direction": "SHORT BUILD on bounce (price up + OI flat-to-up)",
+            "delivery": "FALLING (event-driven bounce only)",
+            "block_deal": "NO",
+            "ban_list": "NO (verify at 8:45 AM)",
+            "strike": "375",
+            "moneyness": "ATM",
+            "expiry": "28-May-2026 (monthly)",
+            "theta_warn": "NO",
+            "st": "RED",
+            "rsi_cond": "BELOW",
+            "stoch": "DOWN",
+            "cand_dir": "BELOW",
+            "cand_level": "374.00",
+            "t1": "367.00",
+            "t2": "360.00",
+            "sl": "382.50",
+            "sl_cond": "15m close above 382.50 (post-result gap fill)",
+            "rr": "2.0:1",
+            "grade_reason": "B+ not A because Q4 beat creates short-term support; crude thesis durable but timing soft.",
+        },
+    ]
+    for s in setups:
+        add_setup_block(doc, s)
 
-doc.add_paragraph()
-add_para(doc, "Volatility & Flows", bold=True, size=12)
-add_bullets(doc, [
-    "India VIX: 17.53 (-6.71%) — ELEVATED zone (17–22). Rule: reduce size, widen stops.",
-    "FII (22 Apr): Net SELL ₹2,078 cr — bearish flow signal.",
-    "DII (22 Apr): Net SELL ₹1,048 cr — unusual, normally DII absorbs. Both-sell = cautious.",
-    "Rupee at 93.80 reinforces FII caution; DXY at 98.57 still benign (<104).",
-])
+    add_heading(doc, "SECTION 5 — FINAL VERDICT", level=1)
 
-doc.add_paragraph()
-add_para(doc, "Options Positioning (28 Apr expiry — no weekly expiry today; NSE moved to Tuesday)", bold=True, size=12)
-add_bullets(doc, [
-    "Max Pain (28 Apr): 24,400 — gravitational pull level",
-    "Highest Call OI: 24,500 CE (OI ~7.8 M) — acts as ceiling/resistance",
-    "Highest Put OI: concentrated 24,000 — support/floor zone",
-    "PCR: reported neutral-to-slightly-bearish; call writers have upper hand near 24,500",
-    "Interpretation: smart money expects 24,000–24,500 range-bound drift into Tuesday expiry",
-])
+    verdict_rows = [
+        ("TODAY'S BIAS", "RANGE (cautious-bull lean)"),
+        ("CONFIDENCE", "MEDIUM"),
+        ("CRUDE MODE", "CAUTION (Rs 8,500-9,000 band; live verified)"),
+        ("VIX SIZING", "HALF SIZE (India VIX 19.42)"),
+        ("ENTRY PERMISSION", "YELLOW"),
+    ]
+    vt = doc.add_table(rows=0, cols=2)
+    vt.style = "Light Grid Accent 1"
+    for k, v in verdict_rows:
+        row = vt.add_row().cells
+        row[0].text = k
+        row[1].text = v
+        for run in row[0].paragraphs[0].runs:
+            run.bold = True
 
-doc.add_paragraph()
-add_para(doc, "Sector Rotation", bold=True, size=12)
-add_bullets(doc, [
-    "Leaders (YTD): PSU banks +29%, Metals +27%, Autos +22%, Private banks +15%, Infra +12%",
-    "Laggards (YTD): IT -12%, Pharma -4%, Energy -3% (downstream drag)",
-    "Yesterday: Bank Nifty outperformed (~56,565). IT & Pharma soft (Wipro -2.83%, Sun Pharma -1.04%)",
-    "Today's tilt: PSU banks + upstream oil (ONGC, Oil India) favoured. Avoid aviation, OMCs.",
-])
+    add_para(doc, "")
+    add_para(doc, "THE BULL CASE:", bold=True, color=RGBColor(0x00, 0x70, 0x30))
+    add_para(
+        doc,
+        "GIFT Nifty +171, US indices at records (May 12), DIIs net +Rs 5,523 Cr absorbing FII supply, "
+        "war-narrative names (ONGC, BEL, defence) rallying on real order flow.",
+    )
 
-# ---------- SECTION 4 — STOCK OPPORTUNITIES ----------
-doc.add_paragraph()
-add_heading(doc, "Section 4 — Stock Opportunities", level=1, color=RGBColor(0x1F, 0x38, 0x64))
+    add_para(doc, "THE BEAR CASE:", bold=True, color=RGBColor(0xC0, 0x00, 0x00))
+    add_para(
+        doc,
+        "FII net sellers 5 consecutive days, India VIX 19.42 elevated, crude $107 sticky, INFY ADR "
+        "-3% pulls IT down, US PPI hotter than expected, Hormuz risk asymmetric to upside in crude.",
+    )
 
-add_para(doc,
-    "Two catalyst-driven setups qualify today. Everything else is noise — two strong picks beat five weak ones.",
-    italic=True, size=10)
+    add_para(doc, "FLIP TRIGGER:", bold=True)
+    add_para(
+        doc,
+        "If Nifty 15-min closes below 23,300 with Bank Nifty confirming -> bias flips to BEAR, "
+        "exit all longs, add puts. If crude pulls back >2% on a Hormuz reopening headline AND Nifty "
+        "breaks 23,580 -> bias flips to BULL, exit OMC/paint puts immediately.",
+    )
 
-# Card helper
-def stock_card(doc, rows, border_hex="1F3864"):
-    t = doc.add_table(rows=len(rows), cols=2)
-    t.style = "Light Grid Accent 1"
-    for i, (k, v) in enumerate(rows):
-        lc = t.rows[i].cells[0]
-        rc = t.rows[i].cells[1]
-        lc.text = ""
-        rc.text = ""
-        p1 = lc.paragraphs[0]
-        r1 = p1.add_run(k)
-        r1.bold = True
-        r1.font.size = Pt(11)
-        shade_cell(lc, "D9E1F2")
-        p2 = rc.paragraphs[0]
-        r2 = p2.add_run(v)
-        r2.font.size = Pt(11)
+    add_para(doc, "")
+    add_para(doc, "NIFTY KEY LEVELS:", bold=True)
+    add_para(
+        doc,
+        "S2 23,200 | S1 23,300 | CRITICAL 23,400 (pivot/max-pain) | R1 23,500 | R2 23,600",
+        bold=True,
+    )
 
-add_para(doc, "STOCK 1 — INFOSYS (INFY)", bold=True, size=13, color=RGBColor(0x1F, 0x38, 0x64))
-stock_card(doc, [
-    ("CMP", "₹1,268.80 (down -3.38% on 22 Apr into results)"),
-    ("Catalyst", "Q4 FY26 results TODAY, 3:45 PM IST — press 4:30 PM, call 5:30 PM"),
-    ("Crude Alignment", "NEUTRAL (IT is crude-agnostic; but rupee weakness is a tailwind for exporters)"),
-    ("Consensus", "PAT ~₹7,508 cr (+4% YoY); Revenue ~₹46,567 cr (+13.7% YoY); seq PAT -1.5%"),
-    ("Option Watch", "INFY 1260 CE / 1260 PE — 24 Apr Fri weekly OR May monthly straddle"),
-    ("Entry Trigger", "POST-RESULT play only. Do NOT pre-position. After 3:45 PM wait for 5-min confirmation: a close above ₹1,290 = long call; close below ₹1,230 = long put."),
-    ("Target", "Beat: 1,320 / 1,350. Miss: 1,210 / 1,180"),
-    ("Stop Loss", "Post-entry, 5-min candle reversal beyond trigger bar"),
-    ("Confidence", "HIGH on volatility; MEDIUM on direction"),
-])
+    add_para(doc, "")
+    add_para(doc, "TOP 3 RANKED:", bold=True)
+    add_bullets(
+        doc,
+        [
+            "#1 ONGC — A+ — Upstream crude beneficiary near 52-wk high — entry ABOVE Rs 299.50 (300 CE).",
+            "#2 BEL — A — War-narrative defence momentum + fresh orders — entry ABOVE Rs 431.50 (430 CE).",
+            "#3 INFY — A — ADR-confirmed gap-down setup near 52-wk low — entry BELOW Rs 1,120 (1120 PE).",
+        ],
+    )
 
-doc.add_paragraph()
-add_para(doc, "STOCK 2 — OIL INDIA (OIL)", bold=True, size=13, color=RGBColor(0x1F, 0x38, 0x64))
-stock_card(doc, [
-    ("CMP", "Large-cap PSU upstream (refer live quote)"),
-    ("Catalyst", "Geopolitical crude premium intact despite ceasefire; Strait of Hormuz still impaired"),
-    ("Crude Alignment", "YES — direct upstream beneficiary; every $1 Brent = meaningful realisation uplift"),
-    ("Option Watch", "ATM CE on monthly expiry (May) — OI liquid; avoid weekly low-liquidity series"),
-    ("Entry Trigger", "Brent holds above $95 intraday + stock SuperTrend GREEN on 15-min + MCX crude reclaims ₹8,500"),
-    ("Target", "+4–5% on the underlying; calls can 1.5–2x"),
-    ("Stop Loss", "Brent breaks $92 OR MCX crude breaks ₹8,200 OR stock breaks prior day low"),
-    ("Confidence", "MEDIUM — requires crude to hold; Iran headlines can swing either way"),
-])
+    add_para(doc, "")
+    add_para(doc, "ONE RISK THAT RUINS EVERYTHING TODAY:", bold=True, color=RGBColor(0xC0, 0x00, 0x00))
+    add_para(
+        doc,
+        "Surprise Hormuz reopening / ceasefire headline during market hours -> crude collapses 5-8%, "
+        "ONGC/BEL gap down, INFY and paints rip higher in seconds. All 5 setups invalidated simultaneously. "
+        "Mitigate: half-size + 13:00 IST time-stop + ready to flip with the headline.",
+    )
 
-doc.add_paragraph()
-add_para(doc, "Watchlist (not actionable without confirmation)", bold=True, size=11)
-add_bullets(doc, [
-    "ONGC — same crude-bull thesis as Oil India; watch for same triggers",
-    "IndiGo — counter-trade: if crude BREAKS ₹8,000 on fresh Iran de-escalation, long calls; not today's base case",
-    "Bank Nifty — 56,565 zone; above 56,800 = reinitiate, below 56,200 = stand aside",
-    "Adani Energy Solutions — Q4 today; unpredictable, skip unless you specialise",
-])
+    add_heading(doc, "ONE-LINE SUMMARY (read at 9:10 AM)", level=1)
+    add_para(
+        doc,
+        "\"Today is RANGE with mild-bull lean because gap-up +171 meets crude-elevated headwind and "
+        "FII selling. Crude ~ Rs 8,740 = CAUTION, sideways-up. Watch ONGC CALL and INFY PUT. Key risk: "
+        "Hormuz headline whipsaw. Size HALF. Flips if Nifty 15m-closes below 23,300 (-> BEAR) or above "
+        "23,580 on crude crash (-> BULL).\"",
+        italic=True,
+        bold=True,
+    )
 
-# ---------- SECTION 5 — DOMESTIC MACRO ----------
-doc.add_paragraph()
-add_heading(doc, "Section 5 — Domestic Macro & India-Specific Triggers", level=1, color=RGBColor(0x1F, 0x38, 0x64))
+    doc.save(OUT_PATH)
+    print(f"Saved: {OUT_PATH}")
 
-add_kv_table(doc,
-    header=["Driver", "Status"],
-    rows=[
-        ["RBI Repo Rate", "5.25% unchanged (MPC 6–8 Apr); stance: NEUTRAL"],
-        ["CPI (Mar 2026)", "3.4% YoY — below 4% target (supportive)"],
-        ["RBI CPI Projection FY27", "4.6%"],
-        ["GDP Growth Projection FY27", "6.9%"],
-        ["Earnings Today", "INFOSYS (marquee), Adani Energy Solutions, several mid-caps"],
-        ["Earnings Yesterday", "Nestle India beat (+27% PAT); Wipro miss; HCLTech reported"],
-        ["US Fed Events This Week", "None major today; watch Fed speak on tape"],
-        ["US CPI/PPI", "Not releasing today"],
-        ["India Macro Data Today", "None scheduled"],
-        ["Regulatory", "SEBI expiry-day move: Nifty weekly now TUESDAY (not Thursday)"],
-        ["Domestic Macro Verdict", "SUPPORTIVE on rates + CPI; HEADWIND from earnings uncertainty"],
-    ])
 
-# ---------- SECTION 6 — FINAL VERDICT ----------
-doc.add_paragraph()
-add_heading(doc, "Section 6 — Final Verdict", level=1, color=RGBColor(0xC0, 0x00, 0x00))
-
-add_kv_table(doc,
-    header=["Parameter", "Reading"],
-    rows=[
-        ["Crude Rule Mode", "MILD BULL (caution tilt — ₹8,390 MCX)"],
-        ["Market Bias", "WAIT — Nifty broke 24,400; needs to reclaim 24,450 to re-enter"],
-        ["VIX Sizing Rule", "HALF-SIZE (VIX 17.53 in 17–22 band)"],
-        ["Key Support", "24,322 → 24,000"],
-        ["Key Resistance", "24,500 → 24,600"],
-        ["Critical Crude Level", "₹8,500 MCX — flips bias to half-size if crossed"],
-        ["Top Risk Event 1", "Infosys Q4 result 3:45 PM — can gap IT sector ±3%"],
-        ["Top Risk Event 2", "Any fresh Iran headline — crude whiplash"],
-        ["Entry Permission", "CAUTION — no fresh longs until 24,450 reclaim"],
-    ])
-
-doc.add_paragraph()
-add_para(doc, "Reason for CAUTION:", bold=True, size=12, color=RGBColor(0xC0, 0x00, 0x00))
-add_para(doc,
-    "Nifty closed -0.81% below 24,400 support. Both FII (-₹2,078 cr) and DII (-₹1,048 cr) were net sellers — "
-    "a rare double-sell that punishes impatient longs. US overnight was a tailwind (S&P, Nasdaq at records) "
-    "but Gift Nifty is only flat-to-down. Infosys earnings after-market is the binary event that will "
-    "dictate IT-sector direction into Friday.",
-    size=11)
-
-doc.add_paragraph()
-add_para(doc, "ONE-LINE SUMMARY", bold=True, size=13, color=RGBColor(0x1F, 0x38, 0x64))
-add_para(doc,
-    "\"Today is a WAIT day. Crude at ₹8,390 = MILD BULL with fragile tilt. Watch INFY on post-result 5-min "
-    "confirmation after 3:45 PM; shadow OIL INDIA if Brent holds $95. Key risk: Iran headlines and INFY "
-    "guidance. Size HALF based on VIX at 17.53.\"",
-    italic=True, size=12)
-
-# ---------- FOOTER ----------
-doc.add_paragraph()
-doc.add_paragraph()
-foot = doc.add_paragraph()
-foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
-fr = foot.add_run("Generated by Daily Trading Routine — for personal educational use only. Not financial advice.")
-fr.italic = True
-fr.font.size = Pt(9)
-fr.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
-
-doc.save(OUT_PATH)
-print(f"Wrote {OUT_PATH}")
+if __name__ == "__main__":
+    main()
