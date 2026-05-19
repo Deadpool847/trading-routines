@@ -1,1 +1,2 @@
 
+2026-05-19 | RANGE LOW | Crude ₹9,910 FALLING | Override: NO (A=NO, B=YES, C=YES, D=expiry) | Top: HDFCBANK-PE A + RELIANCE-PE A | Flip: WTI < $95 = mode flip to CAUTIOUS BULL
