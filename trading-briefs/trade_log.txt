@@ -1,1 +1,2 @@
 
+2026-05-25 | RANGE MEDIUM | Crude Rs 9,160 FLAT-FIRM (BEAR mode) | Override: NO | Top: INDIGO A(PUT) + BEL A(CALL) | Flip: Nifty 15-min close < 23,700 -> BEAR
