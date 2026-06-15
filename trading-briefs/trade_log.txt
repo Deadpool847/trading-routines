@@ -1,1 +1,5 @@
 
+DATE       | SESSION  | BRIEF SCORE | PAPER TRADES | NOTES
+-----------|----------|-------------|--------------|----------------------------------------
+2026-04-23 | WAIT     | N/A         | 0            | CAUTION regime. No trades per brief.
+2026-06-15 | ACTIVE   | N/A         | 0            | Fresh start. No prior brief on file for postmortem. Gap-up day (Iran deal +GIFT+260). Crude MILD_BULL ₹7,688. YELLOW entry permission. Watching: INDIGO A+, BPCL A, HDFCBANK A, TATAMOTORS B+, NIFTY 23300 PE hedge. Weekly expiry TOMORROW Jun 16.
