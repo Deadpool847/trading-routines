@@ -1,1 +1,4 @@
-
+DATE       | BRIEF_BIAS         | CRUDE_REGIME     | ENTRY_PERM | SCORE | NOTES
+-----------|-------------------|-----------------|-----------|-------|---------------------------
+2026-04-23 | WAIT              | MILD_BULL       | CAUTION   | N/A   | First stored brief. INFY Q4 results day. VIX 17.53 (half-size).
+2026-06-22 | MODERATELY_BULL   | AGGRESSIVE_BULL | YELLOW→G  | N/A   | Restart after 2-month gap. Iran Hormuz contested. FII +4859cr Jun20. Expiry week (monthly Jun26). THE NUMBER: 24200.
