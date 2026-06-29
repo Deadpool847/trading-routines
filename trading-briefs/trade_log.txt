@@ -1,1 +1,8 @@
 
+DATE       | STOCK  | DIR  | ENTRY  | T1     | T2     | SL     | OUTCOME | NOTES
+-----------|--------|------|--------|--------|--------|--------|---------|------
+2026-06-29 | HPCL   | CALL | ~₹415  | ₹437   | ₹460   | ₹403   | PAPER   | A+ — OMC margin play; AGGRESSIVE_BULL crude ₹6,625
+2026-06-29 | HAL    | CALL | ~₹4500 | ₹4680  | ₹4850  | ₹4400  | PAPER   | A  — Mandatory macro hedge; US-Iran military escalation
+2026-06-29 | IOC    | CALL | ~₹150  | ₹161   | ₹170   | ₹145   | PAPER   | A  — OMC sector #2; stagger 30min after HPCL
+2026-06-29 | BHEL   | CALL | ~₹240  | ₹255   | ₹268   | ₹233   | PAPER   | B+ — Infra/defence supply; affordable lot
+2026-06-29 | HCLTECH| PUT  | ~₹1900 | ₹1820  | ₹1770  | ₹1935  | PAPER   | B  — OPTIONAL; Nasdaq 5-day losing streak hedge
